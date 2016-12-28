@@ -8,11 +8,13 @@ use JSON::XS qw/decode_json/;
 use Encode qw/encode_utf8/;
 use Getopt::Long qw/:config posix_default no_ignore_case bundling auto_help/;
 
+# See https://developer.github.com/v3/issues/#list-issues-for-a-repository
 my %args = (
     state        => 'open',
     sort         => 'updated',
     direction    => 'asc',
     since        => '2015-12-31T15:00:00Z', # YYYY-MM-DDTHH:MM:SSZ
+    assignee     => '*', # 有効な値は * または none または username
     per_page     => 100,
     max_page     => 0, # 0 は無制限。2 は next を見ない
     log_debug    => 0,
@@ -27,8 +29,9 @@ GetOptions(
       sort|so=s
       direction|d=s
       since|si=s
+      assignee|a=s
       per_page|p=i
-      access_token|a=s
+      access_token|t=s
       max_page|m=i
       log_debug
       /
@@ -42,6 +45,7 @@ sub build_init_uri() {
         sort         => $args{sort},
         direction    => $args{direction},
         since        => $args{since},
+        assignee     => $args{assignee},
         per_page     => $args{per_page},
         access_token => $args{access_token},
     };
