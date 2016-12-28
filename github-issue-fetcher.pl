@@ -14,7 +14,8 @@ my %args = (
     sort         => 'updated',
     direction    => 'asc',
     since        => '2015-12-31T15:00:00Z', # YYYY-MM-DDTHH:MM:SSZ
-    assignee     => '*', # 有効な値は * または none または username
+    assignee     => '', # 有効な値は * または none または username
+    mentioned    => '',
     per_page     => 100,
     max_page     => 0, # 0 は無制限。2 は next を見ない
     log_debug    => 0,
@@ -30,6 +31,7 @@ GetOptions(
       direction|d=s
       since|si=s
       assignee|a=s
+      mentioned|me=s
       per_page|p=i
       access_token|t=s
       max_page|m=i
@@ -40,19 +42,22 @@ GetOptions(
 my $ua = HTTP::Tiny->new(timeout => 10);
 
 sub build_init_uri() {
-    my $query_parameters = {
-        state        => $args{state},
-        sort         => $args{sort},
-        direction    => $args{direction},
-        since        => $args{since},
-        assignee     => $args{assignee},
-        per_page     => $args{per_page},
-        access_token => $args{access_token},
-    };
+    my %query_parameters = map {
+        length($args{$_}) ? ($_ => $args{$_}) : ()
+    } (
+        'state',
+        'sort',
+        'direction',
+        'since',
+        'assignee',
+        'mentioned',
+        'per_page',
+        'access_token',
+    );
 
     my $uri = URI->new('https://api.github.com');
     $uri->path(sprintf 'repos/%s/issues', $args{target_repo});
-    $uri->query_form($query_parameters);
+    $uri->query_form(%query_parameters);
     return $uri->as_string;
 }
 
