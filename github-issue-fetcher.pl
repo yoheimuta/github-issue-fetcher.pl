@@ -118,60 +118,66 @@ sub prettyPrint(@) {
         'Sep', 'Oct', 'Nov', 'Dec'
     );
 
-    my %issues_by_month = _group_by_month(@issues);
-    foreach my $month (sort keys %issues_by_month) {
-        my $month_name = $month_names[$month-1];
-        print encode_utf8("\n# Activities in $month_name\n");
+    my %issues_by_when = _group_by_year_and_month(@issues);
+    foreach my $year (sort keys %issues_by_when) {
+        my $issues_by_month = $issues_by_when{$year};
+        foreach my $month (sort keys %$issues_by_month) {
+            my $month_name = $month_names[$month-1];
+            print encode_utf8("\n# Activities in $month_name $year\n");
 
-        my %month_groups;
+            my %month_groups;
 
-        my $month_issues = $issues_by_month{$month};
-        foreach my $issue (@$month_issues) {
-            # output the link of each issue
-            my $title    = $issue->{title};
-            my $html_url = $issue->{html_url};
-            my $text = sprintf "- [%s](%s)\n",
-                $title, $html_url;
-            print encode_utf8($text);
+            my $month_issues = $issues_by_month->{$month};
+            foreach my $issue (@$month_issues) {
+                # output the link of each issue
+                my $title    = $issue->{title};
+                my $html_url = $issue->{html_url};
+                my $text = sprintf "- [%s](%s)\n",
+                    $title, $html_url;
+                print encode_utf8($text);
 
-            # aggregate labels
-            my $labels = $issue->{labels};
-            foreach my $label (@$labels) {
-                if (my $name = $label->{name}) {
-                    $month_groups{label}->{$name} //= 0;
-                    $month_groups{label}->{$name}++;
+                # aggregate labels
+                my $labels = $issue->{labels};
+                foreach my $label (@$labels) {
+                    if (my $name = $label->{name}) {
+                        $month_groups{label}->{$name} //= 0;
+                        $month_groups{label}->{$name}++;
+                    }
                 }
             }
-        }
 
-        # output the result of aggregating
-        if (my $lg = $month_groups{label}) {
-            print encode_utf8("\n### Total number of label\n");
-            foreach my $label ( sort { $lg->{$b} <=> $lg->{$a} } keys %$lg) {
-                print encode_utf8(sprintf "- The number of %s is %d\n",
-                    $label, $lg->{$label},
-                );
+            # output the result of aggregating
+            if (my $lg = $month_groups{label}) {
+                print encode_utf8("\n### Total number of label\n");
+                foreach my $label ( sort { $lg->{$b} <=> $lg->{$a} } keys %$lg) {
+                    print encode_utf8(sprintf "- The number of %s is %d\n",
+                        $label, $lg->{$label},
+                    );
+                }
             }
         }
     }
 }
 
-sub _group_by_month(@) {
+sub _group_by_year_and_month(@) {
     my @issues = @_;
 
-    my %issues_by_month;
+    my %issues_by_when;
     foreach my $issue (@issues) {
-        my $month = '';
+        my $year;
+        my $month;
         my $updated_at = $issue->{updated_at};
-        if ($updated_at =~ /\d{4}-(\d{2})-.*/) {
-            $month = $1;
+        if ($updated_at =~ /(\d{4})-(\d{2})-.*/) {
+            $year  = $1;
+            $month = $2;
         }
+        die "[BUG] Failed to extract updated year"  unless $year;
         die "[BUG] Failed to extract updated month" unless $month;
 
-        $issues_by_month{$month} //= [];
-        push @{$issues_by_month{$month}}, $issue;
+        $issues_by_when{$year}->{$month} //= [];
+        push @{$issues_by_when{$year}->{$month}}, $issue;
     }
-    return %issues_by_month;
+    return %issues_by_when;
 }
 
 sub _debug_print($) {
