@@ -14,10 +14,10 @@ my %args = (
     sort         => 'updated',
     direction    => 'asc',
     since        => '2015-12-31T15:00:00Z', # YYYY-MM-DDTHH:MM:SSZ
-    assignee     => '', # 有効な値は * または none または username
+    assignee     => '', # Valid value:  *, none or username
     mentioned    => '',
     per_page     => 100,
-    max_page     => 0, # 0 は無制限。2 は next を見ない
+    max_page     => 0, # 0 = unlimited, 2 = do not load any next pages
     log_debug    => 0,
 );
 if (my $e = $ENV{GITHUB_ACCESS_TOKEN}) {
@@ -74,9 +74,7 @@ sub fetch_issues {
 
     my @ret;
     my $content_json = decode_json $content;
-    foreach my $issue (@$content_json) {
-        push @ret, $issue;
-    }
+    push @ret, @$content_json;
 
     if (my $link = $headers->{link}) {
         my @rel_strs = split ',', $link;
@@ -84,7 +82,7 @@ sub fetch_issues {
         if ($next_url && $next_url !~ /page=$args{max_page}/) {
             my @next_ret = fetch_issues($next_url);
             _debug_print(encode_utf8
-                "next: 取り出した issue の数は" . scalar @next_ret . ", uri=$next_url\n"
+                "next: the number of fetched issues is " . scalar @next_ret . ", uri=$next_url\n"
             );
             push @ret, @next_ret;
         }
@@ -93,25 +91,50 @@ sub fetch_issues {
     return @ret;
 }
 
+sub _extract_next_url(@) {
+    my @raw_strs = @_;
+    foreach my $str (@raw_strs) {
+        my ($link_url, $rel) = split ';', $str;
+
+        $link_url =~ s/^\s*//;
+        $link_url =~ s/^<//;
+        $link_url =~ s/>$//;
+
+        $rel =~ m/rel="(next|last|first|prev)"/;
+        $rel = $1;
+
+        if ($rel eq 'next') {
+            return $link_url;
+        }
+    }
+    return '';
+}
+
 sub prettyPrint(@) {
     my @issues = @_;
 
+    my @month_names = (
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug',
+        'Sep', 'Oct', 'Nov', 'Dec'
+    );
+
     my %issues_by_month = _group_by_month(@issues);
     foreach my $month (sort keys %issues_by_month) {
-        print encode_utf8("\n# $month 月の活動\n");
+        my $month_name = $month_names[$month-1];
+        print encode_utf8("\n# Activities in $month_name\n");
 
         my %month_groups;
 
         my $month_issues = $issues_by_month{$month};
         foreach my $issue (@$month_issues) {
-            # 個別の issue を出力する
+            # output the link of each issue
             my $title    = $issue->{title};
             my $html_url = $issue->{html_url};
             my $text = sprintf "- [%s](%s)\n",
                 $title, $html_url;
             print encode_utf8($text);
 
-            # 集計をする
+            # aggregate labels
             my $labels = $issue->{labels};
             foreach my $label (@$labels) {
                 if (my $name = $label->{name}) {
@@ -121,11 +144,11 @@ sub prettyPrint(@) {
             }
         }
 
-        # 集計を出力する
+        # output the result of aggregating
         if (my $lg = $month_groups{label}) {
-            print encode_utf8("\n### label の集計値\n");
+            print encode_utf8("\n### Total number of label\n");
             foreach my $label ( sort { $lg->{$b} <=> $lg->{$a} } keys %$lg) {
-                print encode_utf8(sprintf "- %s の数は %d\n",
+                print encode_utf8(sprintf "- The number of %s is %d\n",
                     $label, $lg->{$label},
                 );
             }
@@ -151,25 +174,6 @@ sub _group_by_month(@) {
     return %issues_by_month;
 }
 
-sub _extract_next_url(@) {
-    my @raw_strs = @_;
-    foreach my $str (@raw_strs) {
-        my ($link_url, $rel) = split ';', $str;
-
-        $link_url =~ s/^\s*//;
-        $link_url =~ s/^<//;
-        $link_url =~ s/>$//;
-
-        $rel =~ m/rel="(next|last|first|prev)"/;
-        $rel = $1;
-
-        if ($rel eq 'next') {
-            return $link_url;
-        }
-    }
-    return '';
-}
-
 sub _debug_print($) {
     my $text = shift;
     if ($args{log_debug}) {
@@ -180,7 +184,7 @@ sub _debug_print($) {
 my $init_uri = build_init_uri();
 my @issues = fetch_issues($init_uri);
 _debug_print( encode_utf8
-    "all: 取り出した issue の数は " . scalar @issues ."\n"
+    "all: the number of fetched issues is " . scalar @issues ."\n"
 );
 
 prettyPrint(@issues);
