@@ -16,6 +16,7 @@ my %args = (
     since        => '2015-12-31T15:00:00Z', # YYYY-MM-DDTHH:MM:SSZ
     assignee     => '', # Valid value:  *, none or username
     mentioned    => '',
+    labels       => '',
     per_page     => 100,
     max_page     => 0, # 0 = unlimited, 2 = do not load any next pages
     log_debug    => 0,
@@ -32,6 +33,7 @@ GetOptions(
       since|si=s
       assignee|a=s
       mentioned|me=s
+      labels|l=s
       per_page|p=i
       access_token|t=s
       max_page|m=i
@@ -51,6 +53,7 @@ sub build_init_uri() {
         'since',
         'assignee',
         'mentioned',
+        'labels',
         'per_page',
         'access_token',
     );
